@@ -1,5 +1,5 @@
 import os
-from note_detection import detect_notes_with_music21
+from note_detection import detect_notes
 from harmony_analysis import analyze_harmony
 from identify_texture import identify_texture
 from generate_timeline import generate_timeline
@@ -34,7 +34,7 @@ def run_audio_analysis(processed_audio_dir, output_dir):
 
     for audio_file in audio_files:
         print(f"Detectando notas em: {audio_file}...")
-        notes = detect_notes_with_music21(audio_file)
+        notes = detect_notes(audio_file)
         all_detected_notes.append({
             "file": audio_file,
             "notes": notes
