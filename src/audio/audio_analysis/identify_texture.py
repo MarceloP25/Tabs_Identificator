@@ -1,90 +1,44 @@
 """
-Arquivo: identify_texture.py
-Função: Identificar a textura musical do áudio — solo, base ou solo+base.
-Entradas:
-  - data/processed/audio/audio_clean.wav
-Saídas:
-  - data/interim/texture_map.json
-Descrição:
-  Divide o áudio em janelas curtas e extrai características espectrais
-  para classificar a textura musical de cada trecho.
+identify_texture.py
+- Recebe lista de frame classifications (from harmony_analysis.analyze_frames)
+- Agrupa frames contíguos por role (solo/base/mix/silence) gerando segments com start,end,type
+- Salva em data/interim/texture_map.json
 """
 
 import os
 import json
-import numpy as np
-import librosa
-import librosa.display
-import matplotlib.pyplot as plt
+from typing import List, Dict, Any
 
-def extract_features(y, sr, frame_length=2048, hop_length=512):
-    """Extrai as principais features espectrais e harmônicas do áudio."""
-    flatness = librosa.feature.spectral_flatness(y=y, n_fft=frame_length, hop_length=hop_length)[0]
-    centroid = librosa.feature.spectral_centroid(y=y, sr=sr, n_fft=frame_length, hop_length=hop_length)[0]
-    zcr = librosa.feature.zero_crossing_rate(y, frame_length=frame_length, hop_length=hop_length)[0]
-    rms = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0]
-    return flatness, centroid, zcr, rms
+def frames_to_segments(frame_results: List[Dict[str, Any]],
+                       min_duration: float = 0.25,
+                       frame_hop: float = 512/44100.0) -> List[Dict[str, Any]]:
+    """
+    Agrupa frames consecutivos com mesmo role em segmentos.
+    """
+    if not frame_results:
+        return []
 
-def classify_texture(flatness, zcr):
-    """Classifica a textura musical com base em thresholds heurísticos."""
-    textura = []
-    for f, z in zip(flatness, zcr):
-        if f < 0.25 and z < 0.05:
-            textura.append("solo")
-        elif f > 0.4 and z > 0.1:
-            textura.append("base")
-        else:
-            textura.append("solo+base")
-    return np.array(textura)
-
-def smooth_labels(labels, hop_duration, min_duration=0.5):
-    """Agrupa janelas consecutivas de mesmo tipo."""
     segments = []
-    current_label = labels[0]
-    start_time = 0
-    for i, label in enumerate(labels[1:], start=1):
-        if label != current_label:
-            end_time = i * hop_duration
+    current_role = frame_results[0]['role']
+    start_time = frame_results[0]['time']
+    for i in range(1, len(frame_results)):
+        fr = frame_results[i]
+        if fr['role'] != current_role:
+            end_time = frame_results[i]['time']
             duration = end_time - start_time
             if duration >= min_duration:
-                segments.append({"inicio": start_time, "fim": end_time, "tipo": current_label})
+                segments.append({"inicio": start_time, "fim": end_time, "tipo": current_role})
             start_time = end_time
-            current_label = label
-    segments.append({"inicio": start_time, "fim": (len(labels) * hop_duration), "tipo": current_label})
+            current_role = fr['role']
+    # close last
+    end_time = frame_results[-1]['time'] + frame_hop
+    duration = end_time - start_time
+    if duration >= min_duration:
+        segments.append({"inicio": start_time, "fim": end_time, "tipo": current_role})
     return segments
 
-def identify_texture(audio_path="data/processed/audio/audio_clean.wav"):
-    if not os.path.exists(audio_path):
-        raise FileNotFoundError(f"Áudio não encontrado: {audio_path}")
-
-    print("🔊 Carregando áudio para análise de textura...")
-    y, sr = librosa.load(audio_path, sr=44100)
-
-    flatness, centroid, zcr, rms = extract_features(y, sr)
-    hop_duration = 512 / sr
-
-    print("🎼 Classificando trechos...")
-    labels = classify_texture(flatness, zcr)
-    segments = smooth_labels(labels, hop_duration)
-
-    os.makedirs("data/interim", exist_ok=True)
-    output_path = "data/interim/texture_map.json"
-    with open(output_path, "w") as f:
-        json.dump(segments, f, indent=2)
-
-    print(f"✅ Mapa de textura gerado em: {output_path}")
-
-    # Visualização opcional
-    plt.figure(figsize=(10, 3))
-    t = np.arange(len(labels)) * hop_duration
-    plt.plot(t, flatness, label="Flatness", alpha=0.6)
-    plt.plot(t, zcr, label="ZCR", alpha=0.6)
-    plt.title("Características de textura ao longo do tempo")
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
-
-    return output_path
-
-if __name__ == "__main__":
-    identify_texture()
+def save_texture_map(segments: List[Dict[str, Any]], out_path: str = "data/interim/texture_map.json"):
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as fh:
+        json.dump(segments, fh, indent=2, ensure_ascii=False)
+    return out_path
