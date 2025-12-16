@@ -1,75 +1,54 @@
 import os
+import json
 from note_detection import detect_notes
-from harmony_analysis import analyze_harmony
-from identify_texture import identify_texture
+from harmony_analysis import analyze_frames
+from identify_texture import frames_to_segments, save_texture_map
 from generate_timeline import generate_timeline
 
+
 def run_audio_analysis(processed_audio_dir, output_dir):
-    """
-    Executa a pipeline completa de análise de áudio:
-    1. Detecção de notas (Music21)
-    2. Análise de harmonia
-    3. Identificação de textura
-    4. Geração de linha do tempo analítica
-    """
+    print("🎧 Iniciando análise de áudio...")
 
-    print("Iniciando análise de áudio...")
-
-    # --- ETAPA 1: COLETA DOS ARQUIVOS DE ÁUDIO PROCESSADOS ---
     audio_files = [
         os.path.join(processed_audio_dir, f)
         for f in os.listdir(processed_audio_dir)
-        if f.lower().endswith(".wav")
+        if f.endswith(".wav")
     ]
 
     if not audio_files:
-        raise FileNotFoundError(
-            f"Nenhum arquivo WAV encontrado em {processed_audio_dir}"
-        )
+        raise FileNotFoundError("Nenhum WAV encontrado.")
 
-    print(f"{len(audio_files)} arquivos localizados para análise.")
+    all_frames = []
 
-    # --- ETAPA 2: DETECÇÃO DE NOTAS ---
-    all_detected_notes = []
+    for audio in audio_files:
+        frames = detect_notes(audio)
+        all_frames.extend(frames)
 
-    for audio_file in audio_files:
-        print(f"Detectando notas em: {audio_file}...")
-        notes = detect_notes(audio_file)
-        all_detected_notes.append({
-            "file": audio_file,
-            "notes": notes
-        })
+    print("🎼 Analisando harmonia e papel musical...")
+    analyzed_frames = analyze_frames(all_frames)
 
-    # --- ETAPA 3: ANÁLISE DE HARMONIA ---
-    print("Executando análise de harmonia...")
-    harmony_result = analyze_harmony(all_detected_notes)
+    print("🧩 Identificando textura (segmentos)...")
+    segments = frames_to_segments(analyzed_frames)
+    texture_path = save_texture_map(segments)
 
-    # --- ETAPA 4: IDENTIFICAÇÃO DE TEXTURA ---
-    print("Identificando textura musical...")
-    texture_result = identify_texture(all_detected_notes)
+    notes_path = "data/interim/notes_chords.json"
+    os.makedirs(os.path.dirname(notes_path), exist_ok=True)
+    with open(notes_path, "w", encoding="utf-8") as f:
+        json.dump(analyzed_frames, f, indent=2, ensure_ascii=False)
 
-    # --- ETAPA 5: GERAÇÃO DE LINHA DO TEMPO ---
-    print("Gerando timeline analítica...")
-    timeline_path = generate_timeline(
-        all_detected_notes,
-        harmony_result,
-        texture_result,
-        output_dir
+    print("🧱 Gerando timeline final...")
+    timeline = generate_timeline(
+        notes_chords_path=notes_path,
+        texture_map_path=texture_path,
+        out_path=os.path.join(output_dir, "timeline_music.json")
     )
 
-    print("\nAnálise de áudio concluída!")
-    return {
-        "notes": all_detected_notes,
-        "harmony": harmony_result,
-        "texture": texture_result,
-        "timeline": timeline_path,
-    }
+    print("✅ Pipeline de áudio finalizado.")
+    return timeline
 
 
 if __name__ == "__main__":
-    processed_audio_dir = "../../data/processed/audio"
-    output_dir = "../../data/processed/audio"
-
-    results = run_audio_analysis(processed_audio_dir, output_dir)
-    print("\nResumo final da análise:")
-    print(results)
+    run_audio_analysis(
+        processed_audio_dir="../../data/processed/audio",
+        output_dir="../../data/processed/audio"
+    )
