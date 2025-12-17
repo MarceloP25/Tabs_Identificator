@@ -1,22 +1,26 @@
-import cv2
 from detect_fretboard import detect_fretboard
-from rectify_fretboard import rectify_fretboard
+from rectify_fretboard import rectify_fretboard, refine_homography
+from orb_stabilizer import ORBStabilizer
 from detect_frets import detect_frets
 from detect_strings import detect_strings
-from build_fretboard_map import build_fretboard_map
+from grid_visualization import draw_fretboard_grid
 
+stabilizer = ORBStabilizer()
 
-cap = cv2.VideoCapture("sample.mp4")
+def process_frame(frame):
+    roi, bbox = detect_fretboard(frame)
+    if roi is None:
+        return None, None, None
 
+    stabilized, _ = stabilizer.stabilize(roi)
 
-ret, frame = cap.read()
-roi, bbox = detect_fretboard(frame)
-rectified = rectify_fretboard(roi)
-frets = detect_frets(rectified)
-strings = detect_strings(rectified)
+    rectified = rectify_fretboard(stabilized)
 
+    frets = detect_frets(rectified)
+    strings = detect_strings(rectified)
 
-fretboard_map = build_fretboard_map(frets, strings, rectified.shape)
+    refined = refine_homography(rectified, frets, strings)
 
+    debug = draw_fretboard_grid(refined, frets, strings)
 
-print(f"Grid gerado com {len(fretboard_map)} posições")
+    return debug, frets, strings
