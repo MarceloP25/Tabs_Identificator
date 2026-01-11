@@ -1,7 +1,8 @@
 path: data/yolo_dataset
 
-train: images/train
-val: images/val
+train: guitar/train
+val: guitar/val
+test: guitar/test
 
 nc: 1
 names:
