@@ -1,9 +1,0 @@
-path: data/yolo_dataset
-
-train: guitar/train
-val: guitar/val
-test: guitar/test
-
-nc: 1
-names:
-  0: fretboard

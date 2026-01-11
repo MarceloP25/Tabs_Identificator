@@ -1,0 +1,9 @@
+path: yolo_dataset
+
+train: train
+val: val
+test: test
+
+nc: 1
+names:
+  0: fretboard
