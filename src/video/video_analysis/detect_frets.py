@@ -1,12 +1,8 @@
 import cv2
 import numpy as np
+from fretboard_state import Fret
 
 def detect_frets(fretboard_img, max_frets=24):
-    """
-    Detecta trastes usando Hough + heurística musical
-    Retorna lista de coordenadas x (em pixels)
-    """
-
     gray = cv2.cvtColor(fretboard_img, cv2.COLOR_BGR2GRAY)
     edges = cv2.Canny(gray, 80, 160)
 
@@ -22,7 +18,6 @@ def detect_frets(fretboard_img, max_frets=24):
     if lines is None:
         return []
 
-    # Coletar linhas quase verticais
     xs = []
     for x1, y1, x2, y2 in lines[:, 0]:
         if abs(x1 - x2) < 10:
@@ -33,21 +28,26 @@ def detect_frets(fretboard_img, max_frets=24):
 
     xs = sorted(xs)
 
-    # Heurística musical:
-    # espaçamento deve diminuir progressivamente
-    filtered = [xs[0]]
+    frets = []
     last_dist = None
+    index = 0
 
-    for x in xs[1:]:
-        dist = x - filtered[-1]
+    for x in xs:
+        if not frets:
+            frets.append(Fret(index=index, x=x))
+            index += 1
+            continue
+
+        dist = x - frets[-1].x
         if dist < 8:
             continue
 
         if last_dist is None or dist < last_dist * 1.1:
-            filtered.append(x)
+            frets.append(Fret(index=index, x=x))
             last_dist = dist
+            index += 1
 
-        if len(filtered) >= max_frets:
+        if len(frets) >= max_frets:
             break
 
-    return filtered
+    return frets
