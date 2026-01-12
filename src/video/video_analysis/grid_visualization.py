@@ -1,17 +1,26 @@
 import cv2
 
-def draw_fretboard_grid(frame, frets, strings):
-    """
-    frets: lista de coordenadas x
-    strings: lista de coordenadas y
-    """
 
+def draw_hand_mask(frame, hand_mask):
+    vis = frame.copy()
+    vis[hand_mask > 0] = (0, 0, 255)
+    return vis
+
+
+def draw_pressure(frame, frets, strings, pressed_cells):
     vis = frame.copy()
 
-    for x in frets:
-        cv2.line(vis, (int(x), 0), (int(x), vis.shape[0]), (0, 255, 0), 1)
+    for c in pressed_cells:
+        x1 = int(frets[c["fret"]])
+        x2 = int(frets[c["fret"] + 1])
+        y = int(strings[c["string"]])
 
-    for y in strings:
-        cv2.line(vis, (0, int(y)), (vis.shape[1], int(y)), (255, 0, 0), 1)
+        cv2.rectangle(
+            vis,
+            (x1, y - 8),
+            (x2, y + 8),
+            (0, 255, 255),
+            1
+        )
 
     return vis
