@@ -24,3 +24,31 @@ def draw_pressure(frame, frets, strings, pressed_cells):
         )
 
     return vis
+
+
+STRING_LABEL_Y_OFFSET = 15
+
+
+def draw_notes(frame, strings, notes):
+    """
+    Desenha a nota inferida sobre cada corda
+    """
+    for string_id, string_line in enumerate(strings):
+        y = int(string_line.mean())
+        note = notes[string_id]["note"]
+        fret = notes[string_id]["fret"]
+
+        label = note if fret is None else f"{note} (fret {fret})"
+
+        cv2.putText(
+            frame,
+            label,
+            (10, y - STRING_LABEL_Y_OFFSET),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (0, 255, 255),
+            1,
+            cv2.LINE_AA
+        )
+
+    return frame

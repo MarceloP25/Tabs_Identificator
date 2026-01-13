@@ -1,63 +1,39 @@
 import numpy as np
 
 
-def compute_pressure_map(
-    hand_mask,
-    frets,
-    strings,
-    string_band=8,
-    coverage_threshold=0.15
-):
+def build_pressure_map(hand_mask, frets, strings, tolerance_px=5):
     """
-    Detecta células (corda x traste) pressionadas pela mão.
+    Retorna:
+      pressure_map[string_id] = [frets pressionados]
+
+    A pressão é detectada se a mão cobre
+    a região próxima à interseção corda × traste.
     """
 
-    pressed = []
-    h, w = hand_mask.shape
+    pressure_map = {}
 
-    for s_idx, y in enumerate(strings):
-        y1 = max(0, int(y - string_band))
-        y2 = min(h, int(y + string_band))
+    h, w = hand_mask.shape[:2]
 
-        for f_idx in range(len(frets) - 1):
-            x1 = int(frets[f_idx])
-            x2 = int(frets[f_idx + 1])
+    for si, y in enumerate(strings):
+        y = int(y)
+        pressed_frets = []
 
-            if x2 <= x1:
+        for fi, x in enumerate(frets):
+            x = int(x)
+
+            x_min = max(0, x - tolerance_px)
+            x_max = min(w, x + tolerance_px)
+            y_min = max(0, y - tolerance_px)
+            y_max = min(h, y + tolerance_px)
+
+            region = hand_mask[y_min:y_max, x_min:x_max]
+
+            if region.size == 0:
                 continue
 
-            cell = hand_mask[y1:y2, x1:x2]
+            if np.any(region > 0):
+                pressed_frets.append(fi)
 
-            if cell.size == 0:
-                continue
+        pressure_map[si] = pressed_frets
 
-            coverage = np.mean(cell > 0)
-
-            if coverage >= coverage_threshold:
-                pressed.append({
-                    "string": s_idx,
-                    "fret": f_idx,
-                    "coverage": float(coverage)
-                })
-
-    return pressed
-
-
-def resolve_fret_per_string(pressed_cells):
-    """
-    Para cada corda, mantém apenas o MAIOR traste pressionado.
-    """
-
-    resolved = {}
-
-    for cell in pressed_cells:
-        s = cell["string"]
-        f = cell["fret"]
-
-        if s not in resolved or f > resolved[s]["fret"]:
-            resolved[s] = {
-                "fret": f,
-                "coverage": cell["coverage"]
-            }
-
-    return resolved
+    return pressure_map
